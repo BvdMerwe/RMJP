@@ -112,6 +112,22 @@ class Admin {
 
 	}
 
+
+	public function my_headers() {
+		//TODO: NB REMOVE!!
+		// header('X-XSS-Protection:0');
+	}
+
+	/**
+	 * Add links to plugin page
+	 */
+	public function add_additional_action_link($links) {
+		$links = array_merge( array(
+			// '<a href="' . esc_url( admin_url( '/' ) ) . '">' . __( 'Delete Data', $this->plugin_text_domain ) . '</a>'
+		), $links );
+		return $links;
+	}
+
 	public function add_plugin_admin_menu() {
 
 		$page_hook = add_menu_page(
@@ -132,16 +148,26 @@ class Admin {
 			$this->plugin_text_domain.'_judging_platform',
 			array( $this, 'load_categories_list_table' )
 		);
-
-		$edit_categories_page_hook = 'rmjp_edit_category';
+		
+		$edit_categories_page_hook = $this->plugin_text_domain.'_edit_category';
 		
 		$add_categories_page_hook = add_submenu_page(
 			$this->plugin_text_domain."_judging_platform", //parent slug 	
 			__( 'Add Category', $this->plugin_text_domain ), //page title
 			__( 'Add Category', $this->plugin_text_domain ), //menu title
 			'manage_options', //capability
-			$this->plugin_text_domain.'_judging_platform_add_category',
-			array( $this, 'add_category_page' )
+			$this->plugin_text_domain.'_edit_category',
+			array( $this, 'edit_category_page' )
+		);
+		
+
+		$judge_categories_page_hook = add_submenu_page(
+			$this->plugin_text_domain."_judging_platform", //parent slug 
+			__( 'Judge Category', $this->plugin_text_domain ), //page title
+			__( 'Judge Category', $this->plugin_text_domain ), //menu title
+			'manage_options', //capability
+			$this->plugin_text_domain.'_judge_category',
+			array( $this, 'judge_category_page' )
 		);
 		
 		/*
@@ -154,7 +180,12 @@ class Admin {
 		add_action( 'load-'.$page_hook, array( $this, '_screen_options' ) );
 		add_action( 'load-'.$categories_page_hook, array( $this, '_screen_options' ) );
 		add_action( 'load-'.$edit_categories_page_hook, array( $this, 'edit_categories_screen_options' ) );
-		add_action( 'load-'.$add_categories_page_hook, array( $this, 'add_categories_screen_options' ) );
+		add_action( 'load-'.$add_categories_page_hook, array( $this, 'edit_categories_screen_options' ) );
+		add_action( 'load-'.$judge_categories_page_hook, array( $this, '_screen_options' ) );
+
+		//form submissions
+		// $post_categories_page_hook = $this->plugin_text_domain.'_post-category';
+		// add_action( 'load-'.$post_categories_page_hook, array( $this, 'post_category' ) );
 		
 	}
 	/**
@@ -167,7 +198,7 @@ class Admin {
 	*/
 	public function _screen_options() {
 		$arguments = array(
-			'label'		=>	__( 'Users Per Page', $this->plugin_text_domain ),
+			'label'		=>	__( 'Categories Per Page', $this->plugin_text_domain ),
 			'default'	=>	20,
 			'option'	=>	'categories_per_page'
 		);
@@ -176,7 +207,7 @@ class Admin {
 		 * Instantiate the User List Table. Creating an instance here will allow the core WP_List_Table class to automatically
 		 * load the table columns in the screen options panel		 
 		 */	 
-		$this->categories_list_table = new Categories_List_Table( $this->plugin_text_domain );		
+		$this->categories_list_table = new Categories_List_Table( $this->plugin_text_domain );
 	}
 	/*
 	 * Display the Categories List Table
@@ -188,11 +219,11 @@ class Admin {
 
 		//create add link
 		$query_args_edit_category = array(
-			// 'page'		=>  $this->plugin_text_domain.'_edit_category',
-			'action'	=> $this->plugin_text_domain.'_add_category',
-			'_wpnonce'	=> wp_create_nonce( 'add_category_nonce' ),
+			'page'		=>  $this->plugin_text_domain.'_edit_category',
+			// 'action'	=> $this->plugin_text_domain.'_add_category',
+			'_wpnonce'	=> wp_create_nonce( 'edit_category_nonce' ),
 		);
-		$add_category_link = esc_url( add_query_arg( $query_args_edit_category, admin_url( 'admin.php' ) ) );		
+		$add_category_link = esc_url( add_query_arg( $query_args_edit_category, admin_url( 'admin.php' ) ) );
 		// render the List Table
 		include_once( 'views/partials-wp-list-table-categories-display.php' );
 	}
@@ -204,21 +235,183 @@ class Admin {
 	* 
 	* @since    1.0.0
 	*/
-	public function add_categories_screen_options() {
-		$arguments = array(
-			'label'		=>	__( 'Users Per Page', $this->plugin_text_domain ),
-			'default'	=>	20,
-			'option'	=>	'categories_per_page'
-		);
-		add_screen_option( 'per_page', $arguments );
+	public function add_category_screen_options() {
+		add_screen_option( 'help', array() );
 
 		// include_once('views/partials-wp-categories-add.php');
-		// return null;		
+		// return null;
 	}
 
-	public function add_category_page() {
+	public function judge_category_page() {
+		global $wpdb;
+		//if no category is selected
+		if (!isset($_GET['category_id'])) {
+			// query, filter, and sort the data
+			$this->categories_list_table->prepare_items();
+
+			//create add link
+			$query_args_edit_category = array(
+				'page'		=>  $this->plugin_text_domain.'_edit_category',
+				// 'action'	=> $this->plugin_text_domain.'_add_category',
+				'_wpnonce'	=> wp_create_nonce( 'edit_category_nonce' ),
+			);
+			$add_category_link = esc_url( add_query_arg( $query_args_edit_category, admin_url( 'admin.php' ) ) );
+			// render the List Table
+			include_once( 'views/partials-wp-list-table-categories-judge.php' );
+		} else if (!isset($_GET['entry_id'])) { //with category ID but without entry ID
+
+			//TODO: Display Submissions ':D
+			$category = new Category($this->plugin_text_domain);
+			$category->build_category_from_id($_GET['category_id']);
+
+			//get category field ID
+			$wpdb_table = $wpdb->prefix  . 'rm_fields';
+
+			$user_query = "SELECT 
+							field_id
+							FROM 
+							$wpdb_table 
+							WHERE form_id = ".$category->get_category()['form_id']."
+							AND field_label LIKE 'Category'
+							AND field_type LIKE 'Select'";
+	
+			$result = $wpdb->get_results( $user_query, ARRAY_A  );
+
+			if (!$result) {
+				die('It appears that this category is set up with a form that does not have a Category field.');
+			}
+
+			$rm_category_field_id = $result[0]["field_id"];
+
+			//get submission field IDs
+			$wpdb_table = $wpdb->prefix  . 'rm_submission_fields';
+
+			$user_query = "SELECT 
+							submission_id
+							FROM 
+							$wpdb_table 
+							WHERE form_id = ".$category->get_category()['form_id']."
+							AND field_id LIKE '$rm_category_field_id'
+							AND value LIKE '".$category->get_category()['name']."'";
+	
+			$result = $wpdb->get_results( $user_query, ARRAY_A  );
+
+			if (!$result) {
+				die('No entries for this category yet');
+			}
+			$rmjp_submission_id = $result[0]["submission_id"];
+
+			//get submissions
+			$wpdb_table = $wpdb->prefix  . 'rm_submissions';
+
+			$user_query = "SELECT 
+							submission_id, data
+							FROM 
+							$wpdb_table 
+							WHERE submission_id LIKE '$rmjp_submission_id'";
+	
+			$result = $wpdb->get_results( $user_query, ARRAY_A  );
+			$rmjp_submissions = $result;
+
+			$rm_submissions = array();
+			foreach ($rmjp_submissions as $sub) {
+				$submission = array();
+				$submission["id"] = $sub["submission_id"];
+				$submission["data"] = array();
+
+				$submission_data = unserialize($sub['data']);
+
+				foreach ($submission_data as $field) {
+					$field = json_decode(json_encode($field), true);
+					array_push($submission['data'], $field);
+				}
+				array_push($rm_submissions, $submission);
+			}
+
+			include_once( 'views/partials-wp-submission-list.php' );
+			
+			// var_dump($rmjp_submissions[0]["data"]);
+
+		} else { //with both - judging commencing
+			if (!is_numeric($_GET['category_id'])) {
+				//fuckin bomb the fuck out boi!
+				die('You have no power here!');
+			}
+			$judge = new Judge($this->plugin_text_domain);
+			$category = new Category($this->plugin_text_domain);
+			$category->build_category_from_id($_GET['category_id']);
+			
+			//render page
+			include_once( 'views/partials-wp-categories-judge.php' );
+		}
+	}
+
+	public function edit_category_page() {
+
+		$category = new Category( $this->plugin_text_domain );
+		
+		//get data from edit link
+		if(isset($_GET['id'])) {
+			$category->build_category_from_id($_GET['id']);
+			// print_r($category);
+		}
+		$category = $category->get_category();
+		// echo "add_category_page";
 		// query, filter, and sort the data
-		//$this->categories_list_table->prepare_items();
+
+		//get forms from registration magic
+		global $wpdb;
+		$wpdb_table = $wpdb->prefix . 'rm_forms';
+
+		$user_query = "SELECT 
+						form_id, form_name
+						FROM 
+						$wpdb_table 
+						WHERE form_type = 0";
+
+		$result = $wpdb->get_results( $user_query, ARRAY_A  );
+		$rm_forms = $result;
+
+		//create rmjp criteria types
+		$rmjp_types = array(
+			array(
+				"type" => "text",
+				"type_name" => "Text"
+			),
+			array(
+				"type" => "number",
+				"type_name" => "Number"
+			),
+			//TODO: Implement multi-option things
+			// array(
+			// 	"type" => "option",
+			// 	"type_name" => "Dropdown"
+			// ),
+			// array(
+			// 	"type" => "checkbox",
+			// 	"type_name" => "Checkbox"
+			// ),
+			// array(
+			// 	"type" => "radio",
+			// 	"type_name" => "Radio Button"
+			// ),
+		);
+
+		$rmjp_criteria = array();
+		if ($category['id']) {
+			$wpdb_table = $wpdb->prefix  . 'rmjp_criteria';
+
+			$user_query = "SELECT 
+							*
+							FROM 
+							$wpdb_table 
+							WHERE category_id = ".$category['id'];
+	
+			$result = $wpdb->get_results( $user_query, ARRAY_A  );
+			$rmjp_criteria = $result;
+		}
+		
+
 		// render the List Table
 		include_once( 'views/partials-wp-categories-add.php' );
 	} 
@@ -232,9 +425,13 @@ class Admin {
 	* @since    1.0.0
 	*/
 	public function edit_categories_screen_options() {
-		// echo "yes?";
-		include_once('views/partials-wp-list-table-categories-edit.php');
-		// return null;		
+		$arguments = array(
+			'label'		=>	__( 'Show shortcode', $this->plugin_text_domain ),
+			'default'	=>	false,
+			'option'	=>	'show_shortcode'
+		);
+		// add_screen_option( 'per_page', $arguments );
+		// return null;
 	}
 	/*
 	 * Display the Categories Edit Page
@@ -245,5 +442,76 @@ class Admin {
 		$this->categories_list_table->prepare_items();
 		// render the List Table
 		include_once( 'views/partials-wp-list-table-categories-display.php' );
+	}
+
+	/*
+	 * Post the category
+	 */
+	public function post_category(){
+
+		//init error variable
+		$attrs = '';
+
+		//initialise category
+		$category = new Category( $this->plugin_text_domain );
+
+		//initialise Criteria (array)
+		$criteria = array();
+		// print_r($_POST);
+
+		//init categories
+		foreach ($_POST["criteria_id"] as $key => $crit_id) {
+			$crit = new Criteria( $this->plugin_text_domain );
+			$crit->build_criteria(
+				$_POST["criteria_id"][$key],
+				$_POST["id"],
+				$_POST["criteria_type"][$key],
+				$_POST["criteria_title"][$key],
+				$_POST["criteria_tooltip"][$key]
+			);
+			array_push($criteria, $crit);
+		}		
+
+		//post data from form
+		if (isset($_POST['_wpnonce'])) {
+			// var_dump($_POST);
+
+			//quick and dirty sanitise
+			foreach ($_POST as $postkey => $postval) {
+				// echo $postval;
+				$_POST[$postkey] = sanitize_text_field($postval);
+			}
+
+			if ($_POST['id'] == 0) { //add new category
+				check_admin_referer( 'add_category' );
+
+				$category->build_category_from_array(shortcode_atts( $category->get_category(), $_POST, $this->plugin_text_domain ));
+				$category->update_criteria($criteria);
+
+				if ($category->validate()) {
+					$category->insert_category();
+				} else {
+					//TODO: display error
+					$attrs .= '&novalidate';
+				}
+
+			} else { //update existing category
+				check_admin_referer( 'edit_category_'.$_POST['id'] );
+
+				$category->build_category_from_array(shortcode_atts( $category->get_category(), $_POST, $this->plugin_text_domain ));
+				$category->update_criteria($criteria);
+				
+				// var_dump(shortcode_atts( $category->get_category(), $_POST, $this->plugin_text_domain ));
+				// print_r($category);
+				if ($category->validate()) {
+					$category->update_category();
+				} else {
+					//TODO: display error
+					$attrs .= '&novalidate';
+				}
+				// print_r($category);
+			}
+			wp_redirect(esc_url( admin_url('admin.php') ).'?page='.$this->plugin_text_domain.'_judging_platform'.$attrs);
+		}
 	}
 }

@@ -42,7 +42,7 @@ class Activator {
 	 */
 	private static function init_db_tables() {
 		global $wpdb;
-		global $award_judging_db_version;
+		global $rmjp_db_version;
 		//Create Data Tables
 		/*
 		judging_category
@@ -55,7 +55,7 @@ class Activator {
 				end_date
 				category?
 		*/
-		$table_name = $wpdb->prefix . "award_judging_category"; 
+		$table_name = $wpdb->prefix . "rmjp_category"; 
 		$charset_collate = $wpdb->get_charset_collate();
 	
 		$sql = "CREATE TABLE IF NOT EXISTS $table_name (
@@ -66,6 +66,7 @@ class Activator {
 		end_time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
 		shortcode varchar(255) NOT NULL,
 		category varchar(255) NOT NULL,
+		category_deleted boolean NOT NULL,        #deletion flag
 		name varchar(255) NOT NULL,
 		PRIMARY KEY  (id)
 		) $charset_collate;";
@@ -76,22 +77,23 @@ class Activator {
 		/*
 		judging_criteria
 			id
-			judging_page_id
+			category_id
 			criteria_type
 			criteria_title
 			?criteria_options []
 			?
 		*/
-		$table_name = $wpdb->prefix . "award_judging_criteria"; 
+		$table_name = $wpdb->prefix . "rmjp_criteria"; 
 		$charset_collate = $wpdb->get_charset_collate();
 	
 		$sql = "CREATE TABLE IF NOT EXISTS $table_name (
 		id mediumint(9) NOT NULL AUTO_INCREMENT,
-		judging_page_id mediumint(9) NOT NULL,  #link to page table
+		category_id mediumint(9) NOT NULL,  #link to page table
 		criteria_type varchar(255) NOT NULL,    #type to display in editing and viewing - text, shorttext, option, checkbox, radio, number, etc
 		criteria_title varchar(255) NOT NULL,   #Title to display for the criteria
 		criteria_tooltip varchar(255) NOT NULL, #Tooltip to display for the criteria
 		criteria_options varchar(255),          #php array of options for possible dropdown/checkbox/radio
+		criteria_deleted boolean NOT NULL,        #deletion flag
 		PRIMARY KEY  (id)
 		) $charset_collate;";
 	
@@ -104,19 +106,24 @@ class Activator {
 			
 		*/
 	
-		$table_name = $wpdb->prefix . "award_judging_data"; 
+		$table_name = $wpdb->prefix . "rmjp_data"; 
 		$charset_collate = $wpdb->get_charset_collate();
 	
 		$sql = "CREATE TABLE IF NOT EXISTS $table_name (
 		id mediumint(9) NOT NULL AUTO_INCREMENT,
-		judging_criteria_id mediumint(9) NOT NULL,  #link to page table
+		judging_entry_id mediumint(9) NOT NULL,  #link to entry
+		judging_criteria_id mediumint(9) NOT NULL,  #link to criteria
 		judging_value varchar(255) NOT NULL,        #value to display
+		judge_id varchar(255) NOT NULL,        #user id who voted
+		judging_deleted boolean NOT NULL,        #deletion flag
 		PRIMARY KEY  (id)
 		) $charset_collate;";
 	
 		dbDelta( $sql );
 		
-		add_option( 'award_judging_db_version', $award_judging_db_version );
+		add_option( 'rmjp_db_version', $rmjp_db_version );
+
+		// die;
 	}
 
 }

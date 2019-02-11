@@ -22,7 +22,7 @@ class Deactivator {
 	 * @since    1.0.0
 	 */
 	public static function deactivate() {
-
+		Deactivator::die_db_tables();
 	}
 
 	/**
@@ -31,12 +31,19 @@ class Deactivator {
 	 * @since    1.0.0
 	 */
 	public static function die_db_tables() {
+		global $wpdb;
+		global $rmjp_db_version;
 		// if uninstall.php is not called by WordPress, die
-		if (!defined('WP_UNINSTALL_PLUGIN')) {
-			die;
-		}
+		// if (!defined('WP_UNINSTALL_PLUGIN')) {
+		// 	die('you have no power here!');
+		// }
 		// TODO: Remove Tables
-		
+		// $category_table = $wpdb->prefix . "rmjp_category"; 
+		// $criteria_table = $wpdb->prefix . "rmjp_criteria"; 
+		// $data_table = $wpdb->prefix . "rmjp_data"; 
+		// $sql = "DROP TABLE $category_table, $criteria_table, $data_table";
+		// $wpdb->query($sql);
+		// add_option( 'rmjp_db_version', $rmjp_db_version );
 	}
 
 }

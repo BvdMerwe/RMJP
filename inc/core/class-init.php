@@ -127,11 +127,20 @@ class Init {
 		 //Add a top-level admin menu for our plugin
 		$this->loader->add_action( 'admin_menu', $plugin_admin, 'add_plugin_admin_menu' );
 		
-		//when a form is submitted to admin-post.php
-		$this->loader->add_action( 'admin_post_nds_form_response', $plugin_admin, 'the_form_response');
+		//when a form is submitted to admin-post.php from category form
+		$this->loader->add_action( 'admin_post_'.$this->plugin_text_domain.'_post_category', $plugin_admin, 'post_category');
+		
+		//when a form is submitted to admin-post.php from judging form
+		$this->loader->add_action( 'admin_post_'.$this->plugin_text_domain.'_post_judge_category', $plugin_admin, 'post_judge_category');
 
 		//when a form is submitted to admin-ajax.php
 		$this->loader->add_action( 'wp_ajax_nds_form_response', $plugin_admin, 'the_form_response');	
+
+		//add links to plugin page
+		$this->loader->add_filter( 'plugin_action_links_' . $this->plugin_basename, $plugin_admin, 'add_additional_action_link' );
+
+		//set custom headers
+		$this->loader->add_action( 'send_headers', $plugin_admin, 'my_headers' );
 	}
 
 	/**

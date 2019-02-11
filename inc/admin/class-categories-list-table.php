@@ -15,7 +15,8 @@ class Categories_List_Table extends Libraries\WP_List_Table {
 	 * @access   private
 	 * @var      string    $plugin_text_domain    The text domain of this plugin.
 	 */
-	protected $plugin_text_domain;
+  protected $plugin_text_domain;
+  protected $is_judge;
 	
   /*
   * Call the parent constructor to override the defaults $args
@@ -27,6 +28,7 @@ class Categories_List_Table extends Libraries\WP_List_Table {
   public function __construct( $plugin_text_domain ) {
     
     $this->plugin_text_domain = $plugin_text_domain;
+    $this->is_judge = ($_GET['page'] == $this->plugin_text_domain.'_judge_category');
     
     parent::__construct( array( 
         'plural'	=>	'users',	// Plural value used for labels and the objects being listed.
@@ -45,6 +47,7 @@ class Categories_List_Table extends Libraries\WP_List_Table {
       'cb'		=> '<input type="checkbox" />', // to display the checkbox.			 
       'name'	=> __( 'Category Name', $this->plugin_text_domain ),
       'end_time'	=> __( 'Deadline', $this->plugin_text_domain ),
+      'criteria'	=> __( 'Criteria', $this->plugin_text_domain ),
     );		
     return $table_columns;		   
   }	
@@ -93,19 +96,43 @@ class Categories_List_Table extends Libraries\WP_List_Table {
 
   public function fetch_table_data() {
     global $wpdb;
-    $wpdb_table = $wpdb->prefix . 'award_judging_category';		
+    $wpdb_table = $wpdb->prefix . 'rmjp_category';		
     $orderby = ( isset( $_GET['orderby'] ) ) ? esc_sql( $_GET['orderby'] ) : 'form_id';
     $order = ( isset( $_GET['order'] ) ) ? esc_sql( $_GET['order'] ) : 'ASC';
 
     $user_query = "SELECT 
-                      id, name, end_time
+                      cat.id, cat.name, cat.end_time, cat.form_id, GROUP_CONCAT(crit.criteria_title ORDER BY crit.id) AS criteria
                     FROM 
-                      $wpdb_table 
-                    ORDER BY $orderby $order";
+                      $wpdb_table cat
+                    LEFT OUTER JOIN
+                      wp_rmjp_criteria crit
+                    ON
+                      cat.id = crit.category_id";
+
+    //check if judging page and add query
+    if ($this->is_judge) {
+      $user_query .= "
+      WHERE cat.end_time > NOW()";
+    }
+    //finish query with ordering
+    $user_query .= "
+    GROUP BY cat.id
+    ORDER BY $orderby $order";
 
     // query output_type will be an associative array with ARRAY_A.
     $query_results = $wpdb->get_results( $user_query, ARRAY_A  );
     
+    //get form name and append to $query_results
+    $wpdb_table = $wpdb->prefix . 'rm_forms';
+    $user_query = "SELECT 
+                      form_name
+                    FROM
+                      $wpdb_table
+                    WHERE
+                      form_id = ".$query_results["form_id"];
+    
+    array_merge($query_results, $wpdb->get_results( $user_query, ARRAY_A  ));
+
     // return result array to prepare_items.
     return $query_results;		
   }	
@@ -116,18 +143,56 @@ class Categories_List_Table extends Libraries\WP_List_Table {
   * e.g. url/users.php?page=nds-wp-list-table-demo&action=edit_category&user=18&_wpnonce=1984253e5e
   */
   protected function column_name( $item ) {		
+    $activedate = strtotime($item["end_time"]) > strtotime('today');
+
     $admin_page_url =  admin_url( 'admin.php' );
     // row action to view usermeta.
+    $query_args_judge_category = array(
+      'page'		=>  $this->plugin_text_domain.'_judge_category',
+      // 'action'	=> $this->plugin_text_domain.'_edit_category',
+      'category_id'	=> absint( $item['id']),
+    );
+    $query_args_view_category = array(
+      'page'		=>  $this->plugin_text_domain.'_view_category',
+      // 'action'	=> $this->plugin_text_domain.'_edit_category',
+      'id'	=> absint( $item['id']),
+      '_wpnonce'	=> wp_create_nonce( 'view_category_nonce' ),
+    );
     $query_args_edit_category = array(
-      // 'page'		=>  $this->plugin_text_domain.'_edit_category',
-      'action'	=> $this->plugin_text_domain.'_edit_category',
+      'page'		=>  $this->plugin_text_domain.'_edit_category',
+      // 'action'	=> $this->plugin_text_domain.'_edit_category',
       'id'	=> absint( $item['id']),
       '_wpnonce'	=> wp_create_nonce( 'edit_category_nonce' ),
     );
+    $query_args_duplicate_category = array(
+      'page'		=>  $this->plugin_text_domain.'_edit_category',
+      'action'		=>  $this->plugin_text_domain.'_duplicate',
+      // 'action'	=> $this->plugin_text_domain.'_edit_category',
+      'id'	=> absint( $item['id']),
+      '_wpnonce'	=> wp_create_nonce( 'duplicate_category_nonce' ),
+    );
+    
+    $judge_category_link = esc_url( add_query_arg( $query_args_judge_category, $admin_page_url ) );		
+    $view_category_link = esc_url( add_query_arg( $query_args_view_category, $admin_page_url ) );		
     $edit_category_link = esc_url( add_query_arg( $query_args_edit_category, $admin_page_url ) );		
-    $actions['edit_category'] = '<a href="' . $edit_category_link . '">' . __( 'Edit', $this->plugin_text_domain ) . '</a>';		
-    // similarly add row actions for add usermeta.
-    $row_value = '<strong>' . $item['name'] . '</strong>';
+    $duplicate_category_link = esc_url( add_query_arg( $query_args_duplicate_category, $admin_page_url ) );		
+    $actions = array();
+    if ($activedate) {
+      $actions['judge_category'] = '<a href="' . $judge_category_link . '">' . __( 'View Entries', $this->plugin_text_domain ) . '</a>';		 
+    }
+    //if not judging page
+    if (!$this->is_judge) {
+      $actions['view_category'] = '<a href="' . $view_category_link . '">' . __( 'View Results', $this->plugin_text_domain ) . '</a>';		
+      $actions['edit_category'] = '<a href="' . $edit_category_link . '">' . __( 'Edit', $this->plugin_text_domain ) . '</a>';		
+      $actions['duplicate_category'] = '<a href="' . $duplicate_category_link . '">' . __( 'Duplicate', $this->plugin_text_domain ) . '</a>';		
+      
+      $row_value = '<strong><a href="' . $view_category_link . '">' . $item['name']  . '</a></strong>';
+    } else {
+      $row_value = '<strong>' . $item['name']  . '</a></strong>';
+    }
+    $row_value .= '&nbsp;<strong><i>~'.$item["form_name"].'</i></strong>';
+    $row_value .= ($activedate) ? '' : '&nbsp;<strong><i>~Inactive</i></strong>';
+
     return $row_value . $this->row_actions( $actions );
   }
 
