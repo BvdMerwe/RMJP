@@ -3,7 +3,7 @@
 ?>
 <div class="wrap">
     <h2>
-    <?php _e('Entries for '.$category->get_category()['name'], $this->plugin_text_domain); ?>
+    <?php _e('Submissions for '.$judge->get_category()['name'], $this->plugin_text_domain); ?>
     </h2>
     <br/>
     <div class="submission-format">
@@ -17,8 +17,8 @@
             <tbody id="the-list">
 
             <?php
-            foreach ($rm_submissions as $sub) {
-                submission_block($sub);
+            foreach ($rmjp_submissions as $sub) {
+                submission_block($sub, $this->plugin_text_domain);
             }
             ?>
 

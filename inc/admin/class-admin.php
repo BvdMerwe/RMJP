@@ -244,6 +244,9 @@ class Admin {
 
 	public function judge_category_page() {
 		global $wpdb;
+
+		$judge = new Judge($this->plugin_text_domain);
+
 		//if no category is selected
 		if (!isset($_GET['category_id'])) {
 			// query, filter, and sort the data
@@ -258,75 +261,13 @@ class Admin {
 			$add_category_link = esc_url( add_query_arg( $query_args_edit_category, admin_url( 'admin.php' ) ) );
 			// render the List Table
 			include_once( 'views/partials-wp-list-table-categories-judge.php' );
-		} else if (!isset($_GET['entry_id'])) { //with category ID but without entry ID
+		} else if (!isset($_GET['submission_id'])) { //with category ID but without entry ID
 
 			//TODO: Display Submissions ':D
-			$category = new Category($this->plugin_text_domain);
-			$category->build_category_from_id($_GET['category_id']);
+			$judge = new Judge($this->plugin_text_domain);
+			$rmjp_submissions = $judge->build_judge_submissions();
 
-			//get category field ID
-			$wpdb_table = $wpdb->prefix  . 'rm_fields';
-
-			$user_query = "SELECT 
-							field_id
-							FROM 
-							$wpdb_table 
-							WHERE form_id = ".$category->get_category()['form_id']."
-							AND field_label LIKE 'Category'
-							AND field_type LIKE 'Select'";
-	
-			$result = $wpdb->get_results( $user_query, ARRAY_A  );
-
-			if (!$result) {
-				die('It appears that this category is set up with a form that does not have a Category field.');
-			}
-
-			$rm_category_field_id = $result[0]["field_id"];
-
-			//get submission field IDs
-			$wpdb_table = $wpdb->prefix  . 'rm_submission_fields';
-
-			$user_query = "SELECT 
-							submission_id
-							FROM 
-							$wpdb_table 
-							WHERE form_id = ".$category->get_category()['form_id']."
-							AND field_id LIKE '$rm_category_field_id'
-							AND value LIKE '".$category->get_category()['name']."'";
-	
-			$result = $wpdb->get_results( $user_query, ARRAY_A  );
-
-			if (!$result) {
-				die('No entries for this category yet');
-			}
-			$rmjp_submission_id = $result[0]["submission_id"];
-
-			//get submissions
-			$wpdb_table = $wpdb->prefix  . 'rm_submissions';
-
-			$user_query = "SELECT 
-							submission_id, data
-							FROM 
-							$wpdb_table 
-							WHERE submission_id LIKE '$rmjp_submission_id'";
-	
-			$result = $wpdb->get_results( $user_query, ARRAY_A  );
-			$rmjp_submissions = $result;
-
-			$rm_submissions = array();
-			foreach ($rmjp_submissions as $sub) {
-				$submission = array();
-				$submission["id"] = $sub["submission_id"];
-				$submission["data"] = array();
-
-				$submission_data = unserialize($sub['data']);
-
-				foreach ($submission_data as $field) {
-					$field = json_decode(json_encode($field), true);
-					array_push($submission['data'], $field);
-				}
-				array_push($rm_submissions, $submission);
-			}
+			
 
 			include_once( 'views/partials-wp-submission-list.php' );
 			
@@ -338,8 +279,10 @@ class Admin {
 				die('You have no power here!');
 			}
 			$judge = new Judge($this->plugin_text_domain);
-			$category = new Category($this->plugin_text_domain);
-			$category->build_category_from_id($_GET['category_id']);
+			// $category = new Category($this->plugin_text_domain);
+			// $category->build_category_from_id($_GET['category_id']);
+
+			$judge->build_judge_submission();
 			
 			//render page
 			include_once( 'views/partials-wp-categories-judge.php' );

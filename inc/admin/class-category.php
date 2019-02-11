@@ -197,7 +197,7 @@ class Category {
       if ($critVals['id'] && $critVals['id'] != '') {
         $crit->update_criteria();
       } else {
-        $crit->insert_criteria_with_id($wpdb->insert_id);
+        $crit->insert_criteria_with_id($this->id);
       }
     }
   }

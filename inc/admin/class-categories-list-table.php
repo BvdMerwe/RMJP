@@ -124,16 +124,19 @@ class Categories_List_Table extends Libraries\WP_List_Table {
     
     //get form name and append to $query_results
     $wpdb_table = $wpdb->prefix . 'rm_forms';
-    $user_query = "SELECT 
-                      form_name
-                    FROM
-                      $wpdb_table
-                    WHERE
-                      form_id = ".$query_results["form_id"];
-    
-    array_merge($query_results, $wpdb->get_results( $user_query, ARRAY_A  ));
+    foreach ($query_results as $key => $res) {
+      $user_query = "SELECT 
+                        form_name
+                      FROM
+                        $wpdb_table
+                      WHERE
+                        form_id = ".$query_results[$key]["form_id"];
+      
+      $query_results[$key] = array_merge($res, $wpdb->get_results( $user_query, ARRAY_A  )[0]);
+    }
 
     // return result array to prepare_items.
+    // var_dump($query_results);
     return $query_results;		
   }	
   
